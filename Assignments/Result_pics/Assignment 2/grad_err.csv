@@ -1,0 +1,7 @@
+;i = 1;i = 2
+max relError W_i;8.11846e-07;7.74126e-07
+min relError W_i;0.0;0.0
+max relError b_i;1.79771e-09;4.29138e-10
+min relError b_i;0.0;4.70533e-11
+% wrong W_i (< 1e-6);0.0;0.0
+% wrong b_i (< 1e-6);0.0;0.0

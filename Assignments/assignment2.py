@@ -123,8 +123,8 @@ def compute_cost(X, Y, theta, lambda_reg):
 # number of predictions 
 # returns:
 #	The accuracy of the model, acc (correctly classified/samples)
-def compute_accuracy(X, y, W, b):
-	p = forward_pass(X, W, b)
+def compute_accuracy(X, y, theta):
+	p, h = forward_pass(X, theta)
 	# get columnwise argmax
 	p_star = np.argmax(p, axis=0)
 	correct = np.sum(p_star == y)
@@ -182,7 +182,7 @@ def compute_gradients(X, Y, P, theta, h, lambda_reg):
 # plot = boolean for plotting
 # returns:
 #	W_star, b_star = the updated weight matrix and bias vector
-def mini_batch_GD(X, Y, GD_params, theta, lambda_reg, i, rho = 0.9, plot = True, momentum = True):
+def mini_batch_GD(X, Y, GD_params, theta, lambda_reg, i = 1, rho = 0.9, plot = True, momentum = True):
 	batches_X, batches_Y = generate_batches(X[0], Y[0], GD_params[1])
 	W_star_1 = theta[0]
 	b_star_1 = theta[1]
@@ -198,16 +198,20 @@ def mini_batch_GD(X, Y, GD_params, theta, lambda_reg, i, rho = 0.9, plot = True,
 	mom_b_2 = np.zeros((b_star_2.shape))
 
 	theta_star = [W_star_1, b_star_1, W_star_2, b_star_2]
+	if(plot):
+		train_cost = np.zeros(GD_params[2] + 1)
+		val_cost = np.zeros(GD_params[2] + 1)
 
-	train_cost = np.zeros(GD_params[2] + 1)
-	val_cost = np.zeros(GD_params[2] + 1)
-
+	best_theta = theta_star
+	min_val = 1000
+	check = 0
 
 	for epoch in range(GD_params[2]):
 		print("epoch: ", epoch)
 
-		train_cost[epoch] = compute_cost(X[0], Y[0], theta_star, lambda_reg)
-		val_cost[epoch] = compute_cost(X[1], Y[1], theta_star, lambda_reg)
+		if(plot):
+			train_cost[epoch] = compute_cost(X[0], Y[0], theta_star, lambda_reg)
+			val_cost[epoch] = compute_cost(X[1], Y[1], theta_star, lambda_reg)
 
 		for batch in range(GD_params[1]):
 			X_batch = batches_X[:,:,batch].T
@@ -235,9 +239,21 @@ def mini_batch_GD(X, Y, GD_params, theta, lambda_reg, i, rho = 0.9, plot = True,
 
 			theta_star = [W_star_1, b_star_1, W_star_2, b_star_2]
 
+		v_cost = compute_cost(X[1], Y[1], theta_star, lambda_reg)
+
+		if(v_cost < min_val):
+			min_val = v_cost
+			best_theta = theta_star
+			check = 0
+		else:
+			check += 1
+
+		if(check > 5):
+			return best_theta
+
 		if(plot):
 			t_cost = compute_cost(X[0], Y[0], theta_star, lambda_reg)
-			v_cost = compute_cost(X[1], Y[1], theta_star, lambda_reg)
+			#v_cost = compute_cost(X[1], Y[1], theta_star, lambda_reg)
 
 			# If weights are very small => log(0) in compute cost => inf/NaN
 			if(np.isnan(t_cost) or np.isinf(t_cost)):
@@ -247,7 +263,6 @@ def mini_batch_GD(X, Y, GD_params, theta, lambda_reg, i, rho = 0.9, plot = True,
 
 			train_cost[epoch + 1] = t_cost
 			val_cost[epoch + 1] = v_cost
-			print("cost: ", t_cost)
 
 		if(momentum):
 			eta = eta * decay_rate
@@ -255,7 +270,7 @@ def mini_batch_GD(X, Y, GD_params, theta, lambda_reg, i, rho = 0.9, plot = True,
 	if(plot):
 		plot_cost(train_cost, val_cost, i, GD_params[0])
 
-	return theta_star
+	return best_theta
 
 "Generates the batches to use for mini-batch GD"
 # X, Y = the data and labels (one-hot encoded)
@@ -298,17 +313,6 @@ def check_grad(X, Y, lambda_reg, h_diff = 1e-5, check_size = 10, dim_size = 3072
 	grad_W, grad_b = compute_gradients(X, Y, P, theta, h, lambda_reg)
 	epsilon = 1e-10
 
-	# df_num = pd.DataFrame(num_grad_W[0])
-	# df_an = pd.DataFrame(grad_W[0])
-	# df_num_2 = pd.DataFrame(num_grad_W[1])
-	# df_an_2 = pd.DataFrame(grad_W[1])
-
-	# df_num.to_csv("num_grad.csv", header = None, sep = ',')
-	# df_an.to_csv("an_grad.csv", header = None, sep = ',')
-	# df_num_2.to_csv("num_grad_2.csv", header = None, sep = ',')
-	# df_an_2.to_csv("an_grad_2.csv", header = None, sep = ',')
-
-
 	comp_W_1 = np.zeros(theta[0].shape)
 	comp_b_1 = np.zeros(theta[1].shape)
 	comp_W_2 = np.zeros(theta[2].shape)
@@ -324,6 +328,8 @@ def check_grad(X, Y, lambda_reg, h_diff = 1e-5, check_size = 10, dim_size = 3072
 
 	abs_W = [abs_W_1, abs_W_2]
 	abs_b = [abs_b_1, abs_b_2]
+
+	errors = np.zeros((6,2))
 
 	for layer in range(2):
 		for i in range(len(comp_W[layer])):
@@ -410,19 +416,18 @@ def grad_slow(X, Y, theta, lambda_reg, h=1e-6):
 	return [grad_W_1, grad_W_2], [grad_b_1, grad_b_2]
 
 "Plots the training and validation cost as a function of epochs"
-def plot_cost(train_cost, val_cost, ind, eta):
+def plot_cost(train_cost, val_cost, eta, ind = 1):
 	colors = ["green", "red", "yellow", "blue", "black"]
 	plt.xlabel("Epochs")
 	plt.ylabel("Cost")
 	epochs = len(train_cost)
-	X = np.linspace(1,epochs,epochs)
-	plt.axis([0, 10, 1.5, 3])
-	plt.plot(X, train_cost, color = colors[ind - 1], label=eta)
-	#plt.plot(X, val_cost, color = "red", label="Validation")
+	X = np.linspace(0,epochs,epochs)
+	#plt.axis([0, epochs, 1, 3])
+	plt.plot(X, train_cost, color = "green", label="Training")
+	plt.plot(X, val_cost, color = "red", label="Validation")
 	plt.legend()
-	#plt.savefig("cost_plot_learning_rates_" + str(ind) + ".png")
-	#plt.savefig("cost_plot_overfit_mom=0.9.png")
-	#plt.close()
+	plt.savefig("cost_plot_ALL_30E" + str(ind) + ".png")
+	plt.close()
 
 "Visualizes the final weight representations"
 def plot_weights(W, ind):
@@ -446,49 +451,90 @@ def grad_check():
 	lambda_reg = 0
 	check_grad(X, Y, lambda_reg, check_size = 10, dim_size=100)
 
+def gen_rand_etas(e_min, e_max, samples):
+	e = e_min + (e_max - e_min) * np.random.uniform(0,1,samples)
+	etas = np.power(10, e)
+
+	return np.sort(etas)
+
+def gen_rand_lambdas(e_min, e_max, samples):
+	e = e_min + (e_max - e_min) * np.random.uniform(0,1,samples)
+	lambdas = np.power(10, e)
+
+	return np.sort(lambdas)
+
 def main():
-	train_X, train_Y, train_y = read_data('data_batch_1')
-	val_X, val_Y, val_y = read_data('data_batch_2')
+	# train_X, train_Y, train_y = read_data('data_batch_1')
+	# val_X, val_Y, val_y = read_data('data_batch_2')
+	# test_X, test_Y, test_y = read_data('test_batch')
+
+	Use all batches of data
+	X_1, Y_1, y_1 = read_data('data_batch_1')
+	X_2, Y_2, y_2 = read_data('data_batch_2')
+	X_3, Y_3, y_3 = read_data('data_batch_3')
+	X_4, Y_4, y_4 = read_data('data_batch_4')
+	X_5, Y_5, y_5 = read_data('data_batch_5')
+	#val_X, val_Y, val_y = read_data('data_batch_2')
 	test_X, test_Y, test_y = read_data('test_batch')
+
+	val_for_train = 9000
+
+	train_X = np.array([np.concatenate((X_1, X_2, X_3, X_4, X_5[:,:val_for_train]), axis = 1)]).reshape((3072, (40000 + val_for_train)))
+	train_Y = np.array([np.concatenate((Y_1, Y_2, Y_3, Y_4, Y_5[:,:val_for_train]), axis = 1)]).reshape((10, (40000 + val_for_train)))
+	val_X = X_5[:,val_for_train:]
+	val_Y = Y_5[:,val_for_train:]
 
 	K = len(train_Y)
 	d = len(train_X)
 	m = 50
 
-	# train_X = train_X[:, :100]
-	# train_Y = train_Y[:, :100]
-	# val_X = val_X[:, :100]
-	# val_Y = val_Y[:, :100]
+	# theta = [W_1, b_1, W_2, b_2]
+	theta = init_model_params(m, d, K, xavier = False)
+
+	# Use only a subset of batch_1
+	# subset_size = 100
+	# train_X = train_X[:, :subset_size]
+	# train_Y = train_Y[:, :subset_size]
+	# val_X = val_X[:, :subset_size]
+	# val_Y = val_Y[:, :subset_size]
 
 	X = [train_X, val_X]
 	Y = [train_Y, val_Y]
 
 	n_epochs = 10
-	n_batch = 1
-	lambdas = [1e-6]
-	etas = [0.5, 0.1, 0.01, 0.001, 0.0001]
+	n_batch = 100
 
-	accuracy = np.zeros(len(etas))
+	# lambdas = gen_rand_lambdas(-6, -4, 10)
+	# etas = gen_rand_etas(-1.7, -1.15, 10)
 
-	for i in range(len(etas)):
-		lambda_reg = lambdas[0]
-		eta = etas[i]
-		GD_params = [eta, n_batch, n_epochs]
+	lambdas = [1e-5]
+	etas = [0.03]
 
-		# theta = [W_1, b_1, W_2, b_2]
-		theta = init_model_params(m, d, K, xavier = True)
-		P, h = forward_pass(train_X, theta)
+	accuracy = np.zeros((len(lambdas), len(etas)))
 
-		#print(compute_cost(X[0], Y[0], theta, lambda_reg))
+	for lamb in range(len(lambdas)):
+		print("lambda: ", lamb + 1, "/", len(lambdas))
+		for e in range(len(etas)):
+			print("eta: ", e + 1, "/", len(etas))
+			lambda_reg = lambdas[lamb]
+			eta = etas[e]
+			GD_params = [eta, n_batch, n_epochs]
 
-		theta_star = mini_batch_GD(X, Y, GD_params, theta, lambda_reg, i + 1)
+			P, h = forward_pass(train_X, theta)
 
-	plt.savefig("cost_plot_etas.png")
-	plt.close()
+			theta_star = mini_batch_GD(X, Y, GD_params, theta, lambda_reg)
+			v_acc = compute_accuracy(X[1], val_y, theta_star)
+			print("acc:", v_acc)
+			accuracy[lamb][e] = v_acc
 
 	print("Accuracy:")
-	for i, acc in enumerate(accuracy):
-		print("Param setting:", i + 1, "| Test accuracy:", acc)
+	for i, lamb in enumerate(lambdas):
+		print("------ lambda = ", lamb, "-----------")
+		for j, eta in enumerate(etas):
+			print("eta = ", eta, " accuracy = ", accuracy[i][j])
+
+	# df_acc = pd.DataFrame(accuracy, index=lambdas, columns=etas)
+	# df_acc.to_csv("grid_search.csv", sep = ',')
 
 
 
