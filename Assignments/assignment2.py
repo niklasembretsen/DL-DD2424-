@@ -207,7 +207,8 @@ def mini_batch_GD(X, Y, GD_params, theta, lambda_reg, i = 1, rho = 0.9, plot = T
 	check = 0
 
 	for epoch in range(GD_params[2]):
-		print("epoch: ", epoch)
+		if(epoch % 10 == 0):
+			print("epoch: ", epoch)
 
 		if(plot):
 			train_cost[epoch] = compute_cost(X[0], Y[0], theta_star, lambda_reg)
@@ -248,7 +249,9 @@ def mini_batch_GD(X, Y, GD_params, theta, lambda_reg, i = 1, rho = 0.9, plot = T
 		else:
 			check += 1
 
-		if(check > 5):
+		if(check == 5):
+			eta = eta/2
+		elif(check > 10):	
 			return best_theta
 
 		if(plot):
@@ -468,7 +471,7 @@ def main():
 	# val_X, val_Y, val_y = read_data('data_batch_2')
 	# test_X, test_Y, test_y = read_data('test_batch')
 
-	Use all batches of data
+	#Use all batches of data
 	X_1, Y_1, y_1 = read_data('data_batch_1')
 	X_2, Y_2, y_2 = read_data('data_batch_2')
 	X_3, Y_3, y_3 = read_data('data_batch_3')
@@ -477,7 +480,7 @@ def main():
 	#val_X, val_Y, val_y = read_data('data_batch_2')
 	test_X, test_Y, test_y = read_data('test_batch')
 
-	val_for_train = 9000
+	val_for_train = 0
 
 	train_X = np.array([np.concatenate((X_1, X_2, X_3, X_4, X_5[:,:val_for_train]), axis = 1)]).reshape((3072, (40000 + val_for_train)))
 	train_Y = np.array([np.concatenate((Y_1, Y_2, Y_3, Y_4, Y_5[:,:val_for_train]), axis = 1)]).reshape((10, (40000 + val_for_train)))
@@ -501,7 +504,7 @@ def main():
 	X = [train_X, val_X]
 	Y = [train_Y, val_Y]
 
-	n_epochs = 10
+	n_epochs = 80
 	n_batch = 100
 
 	# lambdas = gen_rand_lambdas(-6, -4, 10)
@@ -523,7 +526,7 @@ def main():
 			P, h = forward_pass(train_X, theta)
 
 			theta_star = mini_batch_GD(X, Y, GD_params, theta, lambda_reg)
-			v_acc = compute_accuracy(X[1], val_y, theta_star)
+			v_acc = compute_accuracy(test_X, test_y, theta_star)
 			print("acc:", v_acc)
 			accuracy[lamb][e] = v_acc
 
