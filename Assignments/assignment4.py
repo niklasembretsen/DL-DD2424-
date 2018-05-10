@@ -15,56 +15,6 @@ def init_rnn(m):
 
 	return RNN, X, char_to_ind
 
-"Plots the training and validation cost as a function of epochs"
-def plot_cost(train_cost, val_cost, uniform):
-	#colors = ["green", "red", "yellow", "blue", "black"]
-	plt.xlabel("Epochs")
-	plt.ylabel("Loss")
-	epochs = len(train_cost)
-	X = np.linspace(0,epochs,epochs)
-	#plt.axis([0, epochs, 1, 3])
-	plt.plot(X, train_cost, color = "green", label="Training")
-	plt.plot(X, val_cost, color = "red", label="Validation")
-	plt.legend()
-
-	if(uniform):
-		title = "loss_uniform_2.5k-epochs.png"
-	else:
-		title = "loss_regular_20k-epochs.png"
-
-	plt.savefig(title)
-	plt.close()
-
-def best_mod():
-	f = open("best_F1_uni.bin","rb")
-	F_1 = np.load(f)
-	f = open("best_F2_uni.bin","rb")
-	F_2 = np.load(f)
-	f = open("best_W_uni.bin","rb")
-	W = np.load(f)
-	f.close()
-
-	conv, X, Y, y, char_to_ind = init_conv()
-	X, Y, y = get_validation_split(X, Y, y)
-
-	conv.F[0] = F_1
-	conv.F[1] = F_2
-	conv.W = W
-
-	acc, pred_class = conv.compute_accuracy(X[1], y[1])
-	print("Accuracy:", acc)
-	class_acc = conv.compute_class_accuracy(X[1], y[1])
-
-	print("------ CLASS ACCURACY ----------")
-	for c, acc in enumerate(class_acc):
-		print("class", c + 1, ":", acc*100)
-
-	print("------ CLASS PRECITIONS --------")
-	for idx, num in enumerate(pred_class):
-		print("Class", idx + 1, ":", num)
-
-	print("---------------------------------")
-
 def check_grad():
 	RNN, X, char_to_ind = init_rnn(m = 5)
 	Y = X[:,1:]

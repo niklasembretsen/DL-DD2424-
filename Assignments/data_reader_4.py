@@ -2,7 +2,7 @@ import numpy as np
 import pickle
 import pandas as pd
 
-def read_data(new = False):
+def read_data(new = True):
 
 	if(new):
 		directory = 'Datasets/'
@@ -42,4 +42,3 @@ def read_data(new = False):
 		f.close()
 
 	return X, char_to_ind
-
