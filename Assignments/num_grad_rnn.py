@@ -3,7 +3,7 @@ import copy
 import pandas as pd
 
 
-def compute_grads_num(X, Y, RNN, h):
+def compute_grads_num(X, Y, RNN, h, h_0):
 
 	num_grads = []
 
@@ -12,13 +12,13 @@ def compute_grads_num(X, Y, RNN, h):
 		if(param > 2):
 			matrix = False
 
-		grad_i = compute_grad_num(X, Y, param, RNN, h, matrix)
+		grad_i = compute_grad_num(X, Y, param, RNN, h, matrix, h_0)
 		num_grads.append(grad_i)
 
 	return num_grads
 
 
-def compute_grad_num(X, Y, f, RNN, h, matrix):
+def compute_grad_num(X, Y, f, RNN, h, matrix, h_0):
 
 	if(matrix):
 		grad = np.zeros(RNN.grads[f].shape)
@@ -26,9 +26,9 @@ def compute_grad_num(X, Y, f, RNN, h, matrix):
 			for j in range(len(grad[0])):
 				RNN_try = copy.deepcopy(RNN)
 				RNN_try.grads[f][i][j] = RNN.grads[f][i][j] - h
-				l1 = RNN_try.compute_loss(X, Y)
+				l1 = RNN_try.compute_loss(X, Y, h_0)
 				RNN_try.grads[f][i][j] = RNN.grads[f][i][j] + h
-				l2 = RNN_try.compute_loss(X, Y)
+				l2 = RNN_try.compute_loss(X, Y, h_0)
 				grad[i][j] = (l2-l1)/(2*h);
 
 	else: 
@@ -36,9 +36,9 @@ def compute_grad_num(X, Y, f, RNN, h, matrix):
 		for i in range(len(grad)):
 			RNN_try = copy.deepcopy(RNN)
 			RNN_try.grads[f][i] = RNN.grads[f][i] - h
-			l1 = RNN_try.compute_loss(X, Y)
+			l1 = RNN_try.compute_loss(X, Y, h_0)
 			RNN_try.grads[f][i] = RNN.grads[f][i] + h
-			l2 = RNN_try.compute_loss(X, Y)
+			l2 = RNN_try.compute_loss(X, Y, h_0)
 			grad[i] = (l2-l1)/(2*h)
 
 	return grad
@@ -51,17 +51,19 @@ def compute_grad_num(X, Y, f, RNN, h, matrix):
 # check_size = number of data points used for computing the gradients
 def check_grad(RNN, X, Y, h_diff = 1e-4, check_size = 25, to_csv = False):
 	X = X[:,:check_size]
-	Y = Y[:,:check_size]		
+	Y = Y[:,:check_size]	
 
-	num_grads = compute_grads_num(X, Y, RNN, h_diff)
+	h_0 = np.zeros(RNN.m)	
 
-	a, h, o, P = RNN.forward_pass(X)
-	grads = RNN.back_prop(X, Y, a, h, o, P)
+	num_grads = compute_grads_num(X, Y, RNN, h_diff, h_0)
+
+	a, h, o, P = RNN.forward_pass(X, h_0)
+	grads = RNN.back_prop(X, Y, a, h, o, P, h_0)
 
 	epsilon = 1e-10
 	gradient_names = ['W', 'U', 'V', 'b', 'c']
 
-	csv_data = pd.DataFrame(0, index = gradient_names, columns = ['Max relError', 'relErr > 1e-6'], dtype=str)
+	csv_data = pd.DataFrame(' ', index = gradient_names, columns = ['Max relError', 'relErr > 1e-6'], dtype = str)
 
 	for grad in range(len(num_grads)):
 
@@ -73,14 +75,14 @@ def check_grad(RNN, X, Y, h_diff = 1e-4, check_size = 25, to_csv = False):
 					comp[i][j] = abs(grads[grad][i][j] - \
 						num_grads[grad][i][j])/max(epsilon, abs(grads[grad][i][j]) \
 						 + abs(num_grads[grad][i][j]))
-					#print("a:", grads[grad][i][j], "n:", num_grads[grad][i][j])	
+					#print("a:", grads[grad][i][j], "n:", num_grads[grad][i][j], "diff:", comp[i][j])
 
 		else:
+			print("---------", gradient_names[grad], "----------")
 			for i in range(len(comp)):
 				comp[i] = abs(grads[grad][i] - \
 					num_grads[grad][i])/max(epsilon, abs(grads[grad][i]) + abs(num_grads[grad][i]))
-
-				#print("a:", grads[grad][i], "n:", num_grads[grad][i])	
+				#print("a:", grads[grad][i], "n:", num_grads[grad][i], "diff:", comp[i])
 
 		tol_error = 1e-6
 
@@ -88,14 +90,18 @@ def check_grad(RNN, X, Y, h_diff = 1e-4, check_size = 25, to_csv = False):
 		max_g = np.max(comp)
 		min_g = np.min(comp)
 
-		csv_data.set_value(index = gradient_names[grad], col = 'Max relError', value = max_g)
-		csv_data.set_value(index = gradient_names[grad], col = 'relErr > 1e-6', value = relErr_ratio)
-		csv_data.to_csv("relErr_rnn.csv")
+		if(to_csv):
+			csv_data.set_value(index = gradient_names[grad], col = 'Max relError', value = max_g)
+			csv_data.set_value(index = gradient_names[grad], col = 'relErr > 1e-6', value = relErr_ratio)
 
 		print("---------- RELATIVE ERROR for grad:", gradient_names[grad], " ----------")
 		print("max relError:", max_g)
 		print("min relError:", min_g)
 		print("# wrong:", relErr_ratio)
+		print("grad == 0", np.sum(grads[grad] == 0))
+		print("num grad == 0", np.sum(num_grads[grad] == 0))
+		print("max grad", np.max(num_grads[grad]))
 
-	print(csv_data)
+	if(to_csv):
+		csv_data.to_csv("relErr_rnn.csv")
 

@@ -2,7 +2,7 @@ import numpy as np
 import pickle
 import pandas as pd
 
-def read_data(new = True):
+def read_data(new = False):
 
 	if(new):
 		directory = 'Datasets/'
